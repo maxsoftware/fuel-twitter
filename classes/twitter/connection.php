@@ -63,11 +63,12 @@ class Twitter_Connection {
 	 */
 	public function get($url, $params)
 	{
+		$query_string = http_build_query($params['request'], '', '&');
 		
-		$this->init_connection($url);
-		$response = $this->add_curl($url, $params);
-	    
-	    return $response;
+		$this->init_connection($url.'?'.$query_string);
+		$response = $this->add_curl($url.'?'.$query_string, $params);
+		
+		return $response;
 	}
 	
 	/**
