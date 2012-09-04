@@ -399,6 +399,7 @@ class Twitter_Oauth {
 		catch (\TwitterException $e)
 		{
 			$this->errors[] = $e;
+			return array("error" => $e->getMessage());
 		}
 	}
 

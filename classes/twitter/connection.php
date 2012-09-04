@@ -181,7 +181,15 @@ class Twitter_Connection {
 					
 					if ($response->__resp->code !== 200)
 					{
-						throw new \TwitterException(isset($response->__resp->data->error) ? $response->__resp->data->error : $response->__resp->data, $response->__resp->code);
+						$error_keys = array("error", "errors");
+						$error_data = $response->__resp->data;
+						foreach ($error_keys as $k){
+							if (isset($response->__resp->data->{$k})){
+								$error_data = $response->__resp->data->{$k};
+							}
+						}
+
+						throw new \TwitterException($error_data, $response->__resp->code);
 					}
 					
 					return $response;
