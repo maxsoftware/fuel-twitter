@@ -189,6 +189,10 @@ class Twitter_Connection {
 							}
 						}
 
+						if (isset($error_data[0]->message)){
+							$error_data = $error_data[0]->message;
+						}
+						
 						throw new \TwitterException($error_data, $response->__resp->code);
 					}
 					
