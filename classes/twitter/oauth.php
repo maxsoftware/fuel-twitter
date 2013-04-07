@@ -19,12 +19,12 @@ class Twitter_Oauth {
 	protected $request_token_url  = 'http://api.twitter.com/oauth/request_token';
 	protected $access_token_url   = 'http://api.twitter.com/oauth/access_token';
 	protected $signature_method   = 'HMAC-SHA1';
-	protected $version            = '1.1';
+	protected $version            = '1.0';
 	protected $api_url            = 'http://api.twitter.com/1.1';
-	protected $search_url         = 'http://search.twitter.com/';
+	protected $search_url         = 'https://search.twitter.com/';
 	protected $callback = null;
 	protected $errors = array();
-	protected $enable_debug = false;
+	protected $enable_debug = true;
 
 	/**
 	 * Loads in the Twitter config and sets everything up.
@@ -140,7 +140,7 @@ class Twitter_Oauth {
 	{
 		$access_key = $this->get_access_key();
 		$access_secret = $this->get_access_secret();
-		
+        
 		$logged_in = false;
 		
 		if ($this->get_access_key() !== null && $this->get_access_secret() !== null)
@@ -166,19 +166,28 @@ class Twitter_Oauth {
                 $this->set_access_verifier( $_GET['oauth_verifier'] );
             }
             
-			$this->set_access_key($_GET['oauth_token'] );
             
-			$token = $this->get_access_token();            
-			$token = $token->_result;
+			$this->set_access_key( $_GET['oauth_token'] );
+            
+			$token = $this->get_access_token();
+            
+            if ( is_array( $token ) && isset( $token['error'] ) && !empty( $token['error']) ){
+                \Session::delete('twitter_oauthtokens');
+                return $token;
+            }
+            
+            $token = $token->_result;
             
 			$token = (is_bool($token)) ? $token : (object) $token;
-			
+        
 			if ( ! empty($token->oauth_token) && ! empty($token->oauth_token_secret))
 			{
 				$this->set_access_key($token->oauth_token);
 				$this->set_access_secret($token->oauth_token_secret);
+                
+                $this->unset_access_verifier();    
 			}
-			
+            
 			\Response::redirect(\Uri::current());
 			return null;
 		}
@@ -190,7 +199,7 @@ class Twitter_Oauth {
 	 * @return  null
 	 */
 	public function login()
-	{
+	{        
 		if (($this->get_access_key() === null || $this->get_access_secret() === null))
 		{   
 			\Response::redirect($this->get_auth_url());
@@ -326,6 +335,30 @@ class Twitter_Oauth {
 		return $this;
 	}
     
+    
+    /**
+	 * Unsets the access key verifier in the session
+	 *
+	 * @return  $this
+	 */
+	public function unset_access_verifier(  )
+	{
+		$tokens = \Session::get('twitter_oauthtokens');
+		
+        if ($tokens === false || ! is_array($tokens))
+		{
+			$tokens = array( );
+		}
+		else
+		{
+			unset( $tokens['access_verifier'] );
+		}
+		
+		\Session::set('twitter_oauthtokens', $tokens);
+
+		return $this;
+	}
+    
 	/**
 	 * Sets the access secret in the session
 	 *
@@ -393,8 +426,9 @@ class Twitter_Oauth {
 	 * @return  string  The access token
 	 */
 	protected function get_access_token()
-	{
-		return $this->http_request('GET', $this->access_token_url, array( 'oauth_verifier' => $this->get_access_verifier() ) );
+	{        
+       // $result = $this->http_request('GET', $this->access_token_url, array( 'oauth_verifier' => $this->get_access_verifier() ) );
+		return $this->http_request('POST', $this->access_token_url, array( 'oauth_verifier' => $this->get_access_verifier() ) );
 	}
 
     
@@ -413,11 +447,11 @@ class Twitter_Oauth {
 			return false;
 		}
 
-		if (empty($params['oauth_signature']))
+        if (empty($params['oauth_signature']))
 		{
 			$params = $this->prep_params($method, $url, $params);
 		}
-
+        
 		$this->connection = new \Twitter_Connection();
 
 		try
@@ -499,6 +533,8 @@ class Twitter_Oauth {
 		$oauth['oauth_timestamp']         = time();
 		$oauth['oauth_signature_method']  = $this->signature_method;
 		$oauth['oauth_version']           = $this->version;
+        
+        
 		
 		array_walk($oauth, array($this, 'encode_rfc3986'));
 		
