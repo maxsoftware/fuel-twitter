@@ -19,8 +19,8 @@ class Twitter_Oauth {
 	protected $request_token_url  = 'http://api.twitter.com/oauth/request_token';
 	protected $access_token_url   = 'http://api.twitter.com/oauth/access_token';
 	protected $signature_method   = 'HMAC-SHA1';
-	protected $version            = '1.0';
-	protected $api_url            = 'http://api.twitter.com/1';
+	protected $version            = '1.1';
+	protected $api_url            = 'http://api.twitter.com/1.1';
 	protected $search_url         = 'http://search.twitter.com/';
 	protected $callback = null;
 	protected $errors = array();
@@ -159,13 +159,18 @@ class Twitter_Oauth {
 	 */
 	protected function check_login()
 	{
+        
 		if (isset($_GET['oauth_token']))
 		{
-			$this->set_access_key($_GET['oauth_token']);
-			$token = $this->get_access_token();
-			
+            if ( isset( $_GET['oauth_verifier'] ) && !empty( $_GET['oauth_verifier'] ) ){
+                $this->set_access_verifier( $_GET['oauth_verifier'] );
+            }
+            
+			$this->set_access_key($_GET['oauth_token'] );
+            
+			$token = $this->get_access_token();            
 			$token = $token->_result;
-			
+            
 			$token = (is_bool($token)) ? $token : (object) $token;
 			
 			if ( ! empty($token->oauth_token) && ! empty($token->oauth_token_secret))
@@ -187,7 +192,7 @@ class Twitter_Oauth {
 	public function login()
 	{
 		if (($this->get_access_key() === null || $this->get_access_secret() === null))
-		{
+		{   
 			\Response::redirect($this->get_auth_url());
 			return;
 		}
@@ -246,6 +251,19 @@ class Twitter_Oauth {
 		$tokens = \Session::get('twitter_oauthtokens');
 		return ($tokens === null || ! isset($tokens['access_key']) || empty($tokens['access_key'])) ? null : $tokens['access_key'];
 	}
+    
+    /**
+	 * Gets the Access Key Verifier from the Session.
+	 *
+	 * @return  string|null  The Access Key
+	 */
+	public function get_access_verifier()
+	{
+		$tokens = \Session::get('twitter_oauthtokens');
+        
+		return ($tokens === null || ! isset($tokens['access_verifier']) || empty($tokens['access_verifier'])) ? null : $tokens['access_verifier'];
+	}
+    
 
 	/**
 	 * Gets the Access Secret from the Session.
@@ -257,6 +275,7 @@ class Twitter_Oauth {
 		$tokens = \Session::get('twitter_oauthtokens');
 		return ($tokens === false || ! isset($tokens['access_secret']) || empty($tokens['access_secret'])) ? null : $tokens['access_secret'];
 	}
+
 	
 	/**
 	 * Sets the access key in the session
@@ -264,11 +283,11 @@ class Twitter_Oauth {
 	 * @param   string  $access_key  The access key
 	 * @return  $this
 	 */
-	public function set_access_key($access_key)
+	public function set_access_key( $access_key )
 	{
 		$tokens = \Session::get('twitter_oauthtokens');
 		
-		if ($tokens === false || ! is_array($tokens))
+        if ($tokens === false || ! is_array($tokens))
 		{
 			$tokens = array('access_key' => $access_key);
 		}
@@ -282,6 +301,31 @@ class Twitter_Oauth {
 		return $this;
 	}
 
+    
+    /**
+	 * Sets the access key verifier in the session
+	 *
+	 * @param   string  $access_key  The access key
+	 * @return  $this
+	 */
+	public function set_access_verifier( $verifier )
+	{
+		$tokens = \Session::get('twitter_oauthtokens');
+		
+        if ($tokens === false || ! is_array($tokens))
+		{
+			$tokens = array('access_verifier' => $verifier);
+		}
+		else
+		{
+			$tokens['access_verifier'] = $verifier;
+		}
+		
+		\Session::set('twitter_oauthtokens', $tokens);
+
+		return $this;
+	}
+    
 	/**
 	 * Sets the access secret in the session
 	 *
@@ -339,7 +383,7 @@ class Twitter_Oauth {
 	 * @return  string  The request token
 	 */
 	protected function get_request_token()
-	{
+	{   
 		return $this->http_request('GET', $this->request_token_url);
 	}
 	
@@ -350,9 +394,10 @@ class Twitter_Oauth {
 	 */
 	protected function get_access_token()
 	{
-		return $this->http_request('GET', $this->access_token_url);
+		return $this->http_request('GET', $this->access_token_url, array( 'oauth_verifier' => $this->get_access_verifier() ) );
 	}
 
+    
 	/**
 	 * Sends the request to Twitter and returns the response.
 	 *
